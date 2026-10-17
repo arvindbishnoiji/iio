@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "283467136948",
+    "project_id": "darvo1",
+    "storage_bucket": "darvo1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283467136948:android:87f491a0318b42153f7ce1",
+        "android_client_info": {
+          "package_name": "com.darvo.ec"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "283467136948-1pu7intfnicr3ghigvq3iq32h3igsrvk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1fiEviIdG5_yi7AcyxC3m9sec-AdkOfU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283467136948-1pu7intfnicr3ghigvq3iq32h3igsrvk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
