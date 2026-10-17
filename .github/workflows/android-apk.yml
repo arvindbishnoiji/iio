@@ -2,8 +2,12 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches: [main]
+  push:
+    branches:
+      - main
+      - "arena/**"
     paths:
       - "package.json"
       - "package-lock.json"
@@ -38,6 +42,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare public environment configuration
+        run: |
+          if [ ! -f .env.local ] && [ -f .env.example ]; then
+            cp .env.example .env.local
+          fi
+
+      - name: Type-check and run unit tests
+        run: |
+          npm run typecheck
+          npm test
+
       - name: Build web app
         run: npm run build
 
@@ -54,9 +69,11 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build debug APK
+      - name: Ensure gradlew is executable and build debug APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
