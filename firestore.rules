@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'arvinddarabishnoi@gmail.com';
+    }
+
+    function isTextMessage(data) {
+      return data.text is string && data.text.size() > 0 && data.text.size() <= 5000;
+    }
+
+    match /studentThreads/{studentUid} {
+      allow read: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+      allow create: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+      allow update: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+        allow create: if signedIn() && (
+          (request.auth.uid == studentUid
+            && request.resource.data.senderUid == request.auth.uid
+            && request.resource.data.senderRole == 'student'
+            && isTextMessage(request.resource.data))
+          ||
+          (isAdmin()
+            && request.resource.data.senderRole == 'admin'
+            && isTextMessage(request.resource.data))
+        );
+        allow update: if signedIn() && (
+          isAdmin()
+          || (request.auth.uid == studentUid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'isRead']))
+        );
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /users/{studentUid}/notifications/{notificationId} {
+      allow read: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+      allow create: if isAdmin();
+      allow update: if signedIn() && (
+        isAdmin()
+        || (request.auth.uid == studentUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'isRead']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /fcmTokens/{studentUid}/tokens/{tokenId} {
+      allow read: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+      allow create, update: if signedIn() && (
+        (request.auth.uid == studentUid
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 20)
+        || isAdmin()
+      );
+      allow delete: if signedIn() && (request.auth.uid == studentUid || isAdmin());
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow read: if signedIn() && resource.data.active == true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
