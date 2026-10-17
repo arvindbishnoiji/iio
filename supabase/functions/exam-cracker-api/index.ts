@@ -63,8 +63,12 @@ Deno.serve(async (req) => {
       const profile = await getProfile(db, claims.sub);
       if (!profile) return json({ error: "Finish onboarding first." }, 409);
       const kind = url.searchParams.get("kind") || "";
-      const exam = url.searchParams.get("exam") || profile.exam;
-      const classLevel = url.searchParams.get("class") || profile.class_level;
+      const requestedExam = url.searchParams.get("exam") || "";
+      const requestedClass = url.searchParams.get("class") || "";
+      if (requestedExam && requestedExam !== profile.exam) return json({ error: "Content is restricted to your selected exam." }, 403);
+      if (requestedClass && String(requestedClass) !== String(profile.class_level)) return json({ error: "Content is restricted to your selected class." }, 403);
+      const exam = profile.exam;
+      const classLevel = profile.class_level;
       const parentId = url.searchParams.get("parentId") || "";
       if (kind && !ALLOWED_KINDS.has(kind)) return json({ error: "Invalid content kind." }, 400);
       if (parentId && ["lecture", "resource"].includes(kind) && isUuid(parentId)) {
