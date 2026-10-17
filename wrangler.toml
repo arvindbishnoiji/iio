@@ -1,0 +1,5 @@
+name = "ec-content-api"
+main = "workers/ec-content-api/src/index.js"
+compatibility_date = "2026-10-17"
+workers_dev = true
+account_id = "93f8cbbe79e248f8d1db9fccc586f0c3"
