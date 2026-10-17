@@ -39,25 +39,27 @@ Deno.serve(async (req) => {
       const displayName = String(body.displayName || body.display_name || "").trim();
       const exam = String(body.exam || "").toUpperCase();
       const classLevel = String(body.classLevel || body.class_level || "");
+      const avatarUrl = body.avatarUrl !== undefined ? (body.avatarUrl ? String(body.avatarUrl).trim() : null) : (body.avatar_url !== undefined ? (body.avatar_url ? String(body.avatar_url).trim() : null) : (claims.picture || null));
       if (displayName.length < 2 || displayName.length > 80) return json({ error: "Name must be 2-80 characters." }, 400);
       if (!["JEE", "NEET"].includes(exam) || !["11", "12"].includes(classLevel)) return json({ error: "Choose JEE or NEET and class 11 or 12." }, 400);
       const { data, error } = await db.from("student_profiles").upsert({
         firebase_uid: claims.sub, display_name: displayName, email: claims.email || null,
-        exam: exam, class_level: classLevel, avatar_url: claims.picture || null, updated_at: new Date().toISOString()
+        exam: exam, class_level: classLevel, avatar_url: avatarUrl, updated_at: new Date().toISOString()
       }, { onConflict: "firebase_uid" }).select("*").single();
       if (error) throw error;
       return json({ profile: data });
     }
     if (path === "/bootstrap" && method === "GET") {
       const profile = await getProfile(db, claims.sub);
-      if (!profile) return json({ needsOnboarding: true, profile: null, content: [], announcements: [] });
+      if (!profile) return json({ needsOnboarding: true, profile: null, content: [], announcements: [], enrollments: [] });
       let content = await readContent(db, { exam: profile.exam, classLevel: profile.class_level, activeOnly: true });
       content = await hideUnenrolledContent(db, claims.sub, content);
+      const { data: userEnrollments } = await db.from("enrollments").select("id,item_type,item_id,active,created_at").eq("firebase_uid", claims.sub).eq("active", true);
       const { data: announcements, error } = await db.from("announcements").select("id,title,body,audience,active,scheduled_at,created_at")
         .eq("active", true).order("created_at", { ascending: false }).limit(50);
       if (error) throw error;
       const filteredAnnouncements = (announcements || []).filter((a) => audienceMatches(a.audience, profile.exam, profile.class_level) && dateIsVisible(a.scheduled_at));
-      return json({ needsOnboarding: false, profile: profile, content: redactStudentContent(content), announcements: filteredAnnouncements });
+      return json({ needsOnboarding: false, profile: profile, content: redactStudentContent(content), announcements: filteredAnnouncements, enrollments: userEnrollments || [] });
     }
     if (path === "/content" && method === "GET") {
       const profile = await getProfile(db, claims.sub);
@@ -426,7 +428,9 @@ async function readContent(db, options) {
 function redactStudentContent(rows) {
   return (rows || []).map((r) => {
     const copy = Object.assign({}, r);
+    const hasAccessCode = Boolean(copy.access_code || (copy.metadata && (copy.metadata.requiresAccessCode || copy.metadata.hasAccessCode)));
     delete copy.access_code;
+    copy.hasAccessCode = hasAccessCode;
     if (copy.kind === "test" && copy.metadata && Array.isArray(copy.metadata.questions)) {
       copy.metadata = Object.assign({}, copy.metadata, { questions: copy.metadata.questions.map(sanitizeQuestion) });
     }

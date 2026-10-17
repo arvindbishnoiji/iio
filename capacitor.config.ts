@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.darvo.ec',
   appName: 'Exam Cracker',
   webDir: 'dist',
-  bundledWebRuntime: false
 };
 
 export default config;
