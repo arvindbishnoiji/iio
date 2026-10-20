@@ -1,258 +1,385 @@
-# MASTER PROMPT — Exam Cracker Educational App
+# MASTER PROMPT — Exam Cracker Next.js Web App
 
-You are the implementation agent for **Exam Cracker**, an educational app for JEE and NEET students. Work directly in this GitHub repository. The Android application ID must be **com.darvo.ec**. Do not return only a plan or a mockup: inspect the repo, build the working application, commit the code and document any step that genuinely requires a manual Firebase Console action.
+You are the implementation agent for **Exam Cracker (EC)**. Build a real, production-minded, mobile-first **Next.js web application** in this repository, connected to the already configured Firebase project, existing Supabase backend and existing Cloudflare YouTube metadata Worker. Read this entire prompt before editing. This is the source of truth for architecture and requirements.
 
-## 0. Mandatory pre-flight rules
+## 1. Goal and non-negotiable rules
 
-1. Inspect the entire repository before editing. The existing root file google-services.json is the Firebase Android client configuration for project darvo1 and package com.darvo.ec. Preserve it. It is not a Firebase Admin service-account private key.
-2. Do not replace the deployed Cloudflare Worker or Supabase Edge Function with a new service name. Their source files are included in this repository and their deployed URLs are listed in README.md and .env.example.
-3. Do not invent credentials or write placeholders over working public configuration. Never expose a server secret, Supabase secret/service-role key, private key, or Firebase Admin service-account JSON in frontend code, build output, GitHub commits, logs or Markdown. Never require a YouTube Data API key.
-4. The Supabase project and tables already exist. Do not drop, recreate, or broadly expose existing tables. Current direct-client RLS policies intentionally deny public/ordinary-authenticated access; use the Firebase-token-verified Edge Function.
-5. Use the Supabase schema, endpoint contracts and data model below. If a change is necessary, create a small safe migration, update schema documentation, and keep backward compatibility.
-6. Build a complete, attractive, mobile-first application. No dead buttons, fake charts, fake sign-in success, fake test submission, pretend video progress, or hard-coded mock content in production. Empty states must explain how to add content from the admin panel.
-7. Use India time (Asia/Kolkata) for displayed schedules and store timestamps as ISO-8601 UTC values. Handle loading, network errors, expired sessions and failed video imports visibly.
+- App name: Exam Cracker
+- Repository: arvindbishnoiji/iio, default branch main
+- Product: JEE and NEET student learning web app with a protected admin dashboard
+- Admin email: arvinddarabishnoi@gmail.com
+- Firebase project ID: darvo1
+- Android application ID that must remain compatible for a future wrapper: com.darvo.ec. This task is a WEB APP, not a Capacitor/Android project.
+- Use Next.js App Router, TypeScript, accessible reusable React components and a consistent responsive design system. Do not build a standalone Vite app or put the product into one giant HTML file.
+- Do not return only a plan or mockup. Implement files, dependencies, routes, data access, tests, docs and CI.
+- Inspect the full repository before changes. Existing service source files and Google configuration are already present. Preserve the service names and endpoint URLs.
+- Never invent a successful result, fake student data, add dead buttons, simulate a save, make test results up, or claim a build/deployment passed without real evidence. Every important action must persist and have loading/error/success states.
+- Never add a Supabase secret/service-role key, Firebase Admin private key, private service-account JSON or Cloudflare API token to source code, browser bundles, Git commits, logs or public docs. Values prefixed NEXT_PUBLIC_ are browser-public by design and must contain public client configuration only.
+- Do not loosen Supabase RLS or replace it with public read/write policies. Use the existing Firebase-token-verified Supabase Edge Function for all relational data.
+- Do not require a YouTube Data API key. Do not download, scrape private content from, or rehost YouTube video bytes.
+- Use ISO UTC timestamps in storage and show all user-facing schedules in Asia/Kolkata.
+- Maintain a readable codebase, lockfile, TypeScript checks, production build and GitHub Actions verification.
 
-## 1. Required stack and deliverables
+## 2. Before implementation: inspect and document actual repository state
 
-Use Vite + React + TypeScript for the UI and Capacitor for Android. Keep index.html as the Vite document entry and implement the admin panel as the protected /admin route in the same app. Do not put the whole application into one unmaintainable HTML file.
+The current repo contains service configuration/source, not the finished student UI. Inspect the existing files, particularly:
+- google-services.json
+- .env.example
+- README.md
+- MASTER_PROMPT.md
+- workers/ec-content-api/src/index.js
+- wrangler.toml
+- supabase/functions/exam-cracker-api/index.ts
+- supabase/migrations/20261017000000_ec_query_indexes.sql
+- firestore.rules and firebase.json
+- .github/workflows/android-apk.yml
 
-Create/maintain index.html, package.json, lockfile, tsconfig, Vite config, a structured src directory, Capacitor config with appId com.darvo.ec and appName Exam Cracker, Firebase modules, a typed API client for Supabase Edge Function, Cloudflare media-proxy client, reusable components, route guards, responsive styling and Android platform files. Include Firestore rules, build checks, a GitHub Actions debug-APK workflow and setup documentation.
+Do not overwrite or delete the existing service code without understanding it. The root wrangler.toml currently targets the existing media proxy Worker, ec-content-api. It must NOT be used to deploy the Next.js website. Move its configuration to workers/ec-content-api/wrangler.toml, adjust the config's main path to src/index.js, and verify the deployment still targets ec-content-api. Create a separate root configuration for the Next.js website. Update README commands to use the correct config for each deployment. The already-deployed media Worker URL must not change.
 
-Suggested source organization: src/app, src/components, src/features/auth, home, lectures, batches, series, tests, leaderboard, profile, admin, chat, notifications, and src/lib plus src/types. Keep data access out of visual components. Support common Android phones, tablets and desktop admin usage; implement accessibility, semantic form labels, keyboard focus, safe-area insets and graceful long-text wrapping.
+This repo was initially prepared for an Android/Capacitor build. This request now targets a Next.js web app. Remove or replace the obsolete Android APK workflow so it cannot fail on normal web-app commits. Preserve google-services.json for the user's future Android package, but do not treat it as the web Firebase config or a Firebase Admin key. Do not add Capacitor unless explicitly requested later.
 
-## 2. Actual services already provisioned
+## 3. Next.js and Cloudflare hosting
 
-### Firebase project darvo1
+Use Next.js App Router, TypeScript, Tailwind CSS and a small, accessible component system. Organize code by features and keep API/auth logic separate from UI.
 
-Use Firebase Authentication for student/admin sign-in, Firestore for chat and in-app notifications, and Firebase Cloud Messaging for push-notification support. The root Android config file already exists. Web configuration is in .env.example.
+Host the Next.js web application on Cloudflare. Before selecting the adapter, review the current official Cloudflare Next.js deployment guide and check feature compatibility. Cloudflare's current guide recommends vinext for new Next.js-on-Workers projects, but it is beta; use the official Workers-ready setup and run its compatibility/build check. If a required app feature is not reliably supported, use the documented OpenNext adapter and verify that choice with CI instead of silently replacing Next.js with another framework. Pin compatible dependency versions and select security-patched stable releases. Keep the actual application structure in Next.js App Router.
 
-Use Firebase Email/Password authentication and Continue with Google. Students may register with email/password or Google. Persist the Firebase session, handle auth-state restoration/logout, and show friendly error messages. Web sign-in should use Firebase's supported web flow. Native Android Google sign-in must use a Capacitor-compatible native/redirect flow, not rely on a popup that cannot work inside a WebView. Add SHA-1/SHA-256 fingerprints in Firebase Console if required by the chosen Google flow. If OAuth provider enablement, authorised domains, a VAPID key or Android fingerprints are missing, implement the integration and state the exact manual Console action; never pretend it is enabled.
+Deploy the web application as a separate Worker named exam-cracker-web (or another new web-specific name). Never overwrite ec-content-api with website assets. Use the account ID shown in wrangler configuration, but keep deployment credentials as GitHub Actions secrets. Add:
+- production build and type/lint/test workflow;
+- separate Cloudflare deploy workflow, using CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from GitHub Actions secrets/variables;
+- preview instructions and a README section with the final website URL once deployment exists.
 
-Admin identity is exactly **arvinddarabishnoi@gmail.com**. The Firebase Auth user must actually exist. Admin login is sign-in-only: no public admin self-registration and no button that grants privileges. Hide /admin from students and enforce administrator rights again on every backend admin operation. Do not trust an email typed into a field as proof of admin rights. The deployed Edge Function verifies the signed Firebase ID token and compares the verified email claim. Email verification is not required for this project's email-identity admin rule.
+The connected Cloudflare account ID is 93f8cbbe79e248f8d1db9fccc586f0c3. Account ID is configuration, not a secret; the API token is secret. The coding agent has GitHub access, so do not assume it can open the Cloudflare dashboard. If a dashboard action or secret must be supplied by the repository owner, document the exact one-time step. Do not claim the website is live until a real deployment URL is verified.
 
-Firestore collections:
-- studentThreads/{studentUid} with messages at studentThreads/{studentUid}/messages/{messageId}. Message fields should include senderUid, senderRole (student/admin), text, createdAt and optional readAt/attachments.
-- users/{studentUid}/notifications/{notificationId}. Fields: title, body, deepLink, createdAt, readAt/isRead, type.
-- fcmTokens/{studentUid}/tokens/{tokenId} for signed-in device tokens.
-- Optional broadcasts collection for active notices.
+Use environment variables and service bindings in the officially supported way for the selected adapter. The existing media proxy remains a separate public endpoint and is used by the browser through NEXT_PUBLIC_CLOUDFLARE_MEDIA_PROXY_URL.
 
-Use Firestore listeners for live chat and in-app notifications. A student can read/send only their own thread; the admin can read/respond to threads. Do not build open unauthenticated chat or allow students to impersonate admin messages. Store only necessary data. Keep PDF/image/video metadata and links in Supabase, not binary files in Firestore.
+## 4. Actual service connections — use these values
 
-Push caveat: FCM token registration and in-app notifications can be implemented now. Server-sent push requires a secure Firebase Admin credential/service-account setup or another supported trusted sender. google-services.json is not an Admin credential. If no Admin credential exists in Firebase/CI secrets, document the one-time secure setup; never commit a private key.
+### Firebase web app / Authentication / Firestore
 
-### Supabase project and deployed Edge Function
+Firebase project ID: darvo1  
+Auth domain: darvo1.firebaseapp.com  
+Storage bucket: darvo1.firebasestorage.app  
+Messaging sender ID: 283467136948  
+Web app ID: 1:283467136948:web:c66fd594827909eb3f7ce1  
+Measurement ID: G-FMV79YMHBC  
+Firebase web API key: AIzaSyDuvN6q4ybHc6rLTHlYdhSs5_rzvc8nhTA
 
-- Project ref: kncbvcozpcrfvxdbkbtf
-- API URL: https://kncbvcozpcrfvxdbkbtf.supabase.co
-- Edge Function base URL: https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
-- Use VITE_SUPABASE_PUBLISHABLE_KEY as the apikey request header. This is a public client key, not an authorization mechanism.
-- Platform verify_jwt is disabled because students authenticate with Firebase, not Supabase Auth. The Edge Function verifies each Firebase ID token itself. Every non-health route requires Authorization: Bearer followed by the current Firebase ID token. The Edge Function accesses the database with its backend-only Supabase secret/service-role credential. Never move that credential to the app.
-- Refresh the Firebase ID token via currentUser.getIdToken() for API calls. Send Content-Type: application/json, plus the public Supabase key in the apikey header. Handle non-2xx responses and JSON error bodies.
-- Append routes to the Edge Function base URL above. Do not add a second /functions/v1 prefix.
+Use the Firebase modular JavaScript SDK, initialised once in a client-only module. Do not import browser-only Firebase Auth/Firestore/FCM code into server components or run it during server rendering.
 
-Provisioned tables:
-1. student_profiles: firebase_uid primary key, display_name, email, exam, class_level, avatar_url, created_at, updated_at.
-2. course_catalog: id UUID, kind (batch/series/lecture/resource/event/goal/test), title, description, exam (JEE/NEET/Both), classes text array ("11" and/or "12"), active, access_code, metadata JSONB, created_at, updated_at.
-3. lesson_progress: id, firebase_uid, lecture_id (course_catalog UUID stored as text), watched_seconds, completed, updated_at.
-4. exam_attempts: id, firebase_uid, test_id, exam, class_level, score, max_score, correct_count, incorrect_count, unanswered_count, answers JSONB, submitted_at.
-5. enrollments: id, firebase_uid, item_type (batch/series), item_id, active, created_at.
-6. announcements: id, title, body, audience, active, scheduled_at, created_at.
+Authentication:
+- Email/password sign-up and sign-in for students.
+- Continue with Google.
+- Persist/restore session; sign-out; password reset; useful errors for common Firebase Auth codes.
+- Use redirect-based Google sign-in on mobile and handle the redirect result; a popup may be offered on desktop with a fallback.
+- A signed-in student completes onboarding once: name, JEE or NEET, Class 11th or 12th. Save via the backend API before displaying the personalised dashboard.
+- Admin identity is exactly arvinddarabishnoi@gmail.com. Admin can sign in but must not have a public admin self-registration route. The admin must already exist in Firebase Authentication. The backend verifies the signed Firebase ID token and checks the token's email claim. This project does not require email_verified=true for the admin check, but never trusts a typed email or browser-only check.
+- The Google provider and Email/Password provider must actually be enabled in Firebase Console. If not, build the real integration and report the exact manual Console step—do not fake a successful login.
+- Keep local session persistence using Firebase's SDK. Never create your own insecure UID or accept a UID from a student form as proof of identity.
 
-RLS is enabled and denies direct public/ordinary-authenticated access. This is intentional; do not "fix" it with allow-all policies. Use the Edge Function. Indexes have been applied and the source migration is in the repo.
+Firestore is for real-time chat and in-app notifications, not for relational course/test content and not for binary PDFs/videos.
 
-### Cloudflare Worker — no YouTube Data API key
+Collections:
+- studentThreads/{studentUid}
+- studentThreads/{studentUid}/messages/{messageId}
+- users/{studentUid}/notifications/{notificationId}
+- fcmTokens/{studentUid}/tokens/{tokenId}
+- optional broadcasts/{broadcastId}
+
+Chat message fields: senderUid, senderRole ("student" or "admin"), text, createdAt, optional readAt and safe attachment metadata. Use live Firestore listeners, timestamps, unread indicators and optimistic UI only with correct rollback/error handling. A student can access only their own thread. Only the configured admin can read/respond to student threads. Never let a student create a message with senderRole admin. Validate max text length and reject invalid payloads in Firestore Rules and app code. Review and tighten existing firestore.rules rather than blindly trusting it; preserve legitimate admin/student flows.
+
+Notifications: implement a live in-app notification inbox using Firestore, read/unread state and validated internal deep links. Register FCM tokens only after permission is granted. Browser push requires HTTPS and a real VAPID key configured from Firebase Console. If VAPID or supported push environment is absent, Firestore in-app notifications must still work and the UI must not claim push is enabled. Sending push from a trusted server may require Firebase Admin credentials; never commit them. Document remaining server-side setup if required.
+
+Firebase Analytics is optional and must initialise only in the browser. Do not block the app if Analytics is not configured.
+
+### Supabase project and database
+
+Project ref: kncbvcozpcrfvxdbkbtf  
+Project URL: https://kncbvcozpcrfvxdbkbtf.supabase.co  
+Publishable key: sb_publishable_-4si2gp96FDx7ziHHMO7Kg_sasmLYB2  
+Edge Function base URL: https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
+
+The deployed Edge Function slug is exam-cracker-api. Current deployed function version was verified as ACTIVE, version 3. It accepts a Firebase ID token and verifies the token itself; platform-level Supabase verify_jwt is disabled by design because the user authentication system is Firebase.
+
+For each authenticated request to the Edge Function:
+1. Obtain the current Firebase user ID token with currentUser.getIdToken().
+2. Send Authorization: Bearer <firebase-id-token>.
+3. Send apikey: <the Supabase publishable key above>.
+4. Send Content-Type: application/json for JSON requests.
+5. Append routes directly to the base URL above, e.g. base + /profile. Do not add /functions/v1 a second time.
+6. Parse error bodies and handle 401, 403, 409, 410, 5xx and network errors visibly. Refresh/obtain the ID token when needed.
+
+The publishable key is public and not a permission grant. Do not put server-side Supabase secret/service-role keys in the browser. Never use a direct supabase-js browser query to the protected relational tables as a workaround for RLS. Use the supplied Edge Function API. If its server database credential is missing, tell the owner how to set the secret in the Supabase project securely; do not put the secret into the repository.
+
+Existing tables and important columns:
+1. public.student_profiles: firebase_uid (primary key), display_name, email, exam, class_level ("11" or "12"), avatar_url, created_at, updated_at.
+2. public.course_catalog: id UUID, kind (batch, series, lecture, resource, event, goal, test), title, description, exam (JEE, NEET, Both), classes text array ("11" and/or "12"), active, access_code, metadata JSONB, created_at, updated_at.
+3. public.lesson_progress: id UUID, firebase_uid, lecture_id (course_catalog UUID as text), watched_seconds, completed, updated_at.
+4. public.exam_attempts: id UUID, firebase_uid, test_id, exam, class_level, score, max_score, correct_count, incorrect_count, unanswered_count, answers JSONB, submitted_at.
+5. public.enrollments: id UUID, firebase_uid, item_type (batch or series), item_id, active, created_at.
+6. public.announcements: id UUID, title, body, audience, active, scheduled_at, created_at.
+
+RLS is enabled on these tables and policies intentionally deny direct anonymous/ordinary authenticated client table access. Never add public allow-all policies. Query indexes already exist; source migration is under supabase/migrations. If changing backend code, update the checked-in source and deploy the same tested source to the existing function slug rather than creating a competing API. Avoid destructive migrations and never drop production data.
+
+### Cloudflare YouTube/media metadata Worker
 
 Worker name: ec-content-api  
 Base URL: https://ec-content-api.arvinddara0290.workers.dev  
 Source: workers/ec-content-api/src/index.js  
-Wrangler config: wrangler.toml
+Worker deployment configuration should reside at workers/ec-content-api/wrangler.toml.
 
 Endpoints:
-- GET /health
-- GET /video?url=<YouTube video URL> returns videoId, title, author, thumbnail, provider and watchUrl using public metadata.
-- GET /playlist?url=<public YouTube playlist URL>&limit=200&cursor=<optional cursor> imports page-sized lists and returns a nextCursor when more items exist. Continue following nextCursor until exhausted for a complete import. Deduplicate by videoId and show progress.
+- GET https://ec-content-api.arvinddara0290.workers.dev/health
+- GET /video?url=<encoded YouTube video URL>
+- GET /playlist?url=<encoded public YouTube playlist URL>&limit=200&cursor=<optional returned cursor>
 
-This Worker does not need YOUTUBE_API_KEY and must not require a Google YouTube Data API key. It reads public YouTube metadata; private, removed, age-restricted, region-restricted or unavailable videos may fail, and YouTube may change its public page format. Show a useful error and allow manual single-video URL entry. Do not promise autoplay always works: browsers may block unmuted autoplay. After a user clicks, attempt playback and show a Play button if it is blocked. Do not download or rehost YouTube videos.
+Use it for title, thumbnail, author, video ID and playlist metadata. No YouTube Data API key or API quota should be required. For playlist import, repeatedly follow nextCursor, deduplicate by videoId, show progress and support cancellation/partial import. Keep title and thumbnail editable before saving. The public YouTube page format may change; private, blocked, age-restricted, removed or inaccessible playlists may fail. Show a useful error and allow the admin to add videos manually by URL. Never silently save a half-imported playlist as a complete one. Do not download or rehost video files; use YouTube's embedded player with the original video ID.
 
-## 3. Student onboarding
+## 5. Required app routes and UI structure
 
-On first successful sign-in:
-1. Ask for student's display name.
-2. Ask for exam track: JEE or NEET.
-3. Ask class: 11th or 12th.
-4. Save by POST /profile with displayName, exam and classLevel ("11" or "12").
-5. Only then open the personalised home page.
+Create a polished, modern coaching-app design. Use a mobile bottom navigation with Home, Lectures, Leaderboard, Analysis/Profile and an appropriate larger-screen layout. Keep buttons accessible and obvious. The app must work at small phone, tablet and desktop widths. Add skeleton/loading states, empty states, retry, network errors, form validation, toasts, dialogs and safe confirmation for destructive actions. Never use hard-coded sample content in production.
 
-Use Firebase UID as stable student identity. The backend derives it from the verified token. Never accept a student UID in a request body as the identity for profiles, progress or results. Allow editing display name/avatar later. Do not silently change exam/class content if profile save fails. Add logout and expired-session handling.
+Recommended routes:
+- / — redirect to sign-in, onboarding, or personalised home depending on state.
+- /login — sign-in, register and reset password.
+- /onboarding — name, exam and class selection.
+- /home — Today's Goal, banners/events, tests and relevant content.
+- /lectures — batches, My Batches, All Batches, series, lessons and PDF resources.
+- /tests — upcoming/live/completed list and test selector.
+- /leaderboard — test selector and one leaderboard per test.
+- /profile — profile, progress/analysis and logout.
+- /admin — protected admin dashboard.
+- /admin/content — optionally use nested admin sections; no public route may reveal admin data.
+Do not expose secret IDs or email lists to student routes. All content displayed must follow the saved profile exam and class.
 
-## 4. Student navigation and pages
+### Student onboarding and personalised home
 
-Mobile bottom navigation and a suitable large-screen layout:
-- Home
-- Lectures
-- Leaderboard
-- Analysis/Profile
+After a successful Firebase sign-in:
+1. If there is no student profile, collect the student's display name.
+2. Ask JEE or NEET.
+3. Ask Class 11th or 12th.
+4. Save with POST /profile using displayName, exam and classLevel ("11" or "12").
+5. Only continue after save succeeds.
 
-Within Lectures expose Batches, My Batches, All Batches, Series and Resources/PDFs. Add search/filter when useful. Every content family must be filtered by selected exam and class; JEE-11 users must not see NEET-12-only content.
+At the top of Home display a prominent "+ Today's Goal" section/card, driven by active goal records. Below it display:
+- scheduled today's goals with text/time/optional CTA;
+- multiple active event/banner images in a carousel;
+- live tests that are actually configured as live;
+- upcoming tests with schedule and duration;
+- enrolled batches, continue-learning/recent lectures;
+- announcements and unread notifications.
 
-### Home
+Filter content by exam/class everywhere. Interpret all schedules in Asia/Kolkata. Hide goals outside their active window. A goal record uses kind=goal; metadata may contain startsAt, endsAt, deepLink, ctaLabel, priority and optional CTA text.
 
-At the top show a prominent “+ Today's Goal” section/card. Below it show active goal(s), event/banner carousel, live test card(s), upcoming scheduled tests, enrolled-batch continuation/recent lectures and relevant announcements/notifications. Goals/events need enabled state, schedule windows and exam/class targeting. Display times in Asia/Kolkata. A not-yet-visible goal must not appear in the current-goal card.
+### Batches and enrolment
 
-Goal records use kind=goal and metadata can include startsAt, endsAt, deepLink, ctaLabel and priority. Show only active goals within the schedule.
+Show All Batches and My Batches separately. Batch card/detail should include thumbnail, title, description/about, exam/classes, instructor/features and enrolment status. Image URLs must be validated and rendered with object-fit:cover, not stretched.
 
-### Batches
+Admin may configure access_code. If a batch has a code, ask the student for it and submit POST /enrollments with itemType=batch, itemId and accessCode. If there is no code, allow one-tap enrolment. Never expose access_code in student-visible content or browser logs. The backend decides enrolment success; a wrong code must never create an enrolment. Series uses the same pattern with itemType=series.
 
-List/grid cards show thumbnail, name, code display, about, exam/class, instructor/subjects/features and enrollment state. Use object-fit cover and responsive fixed aspect ratios; never stretch images.
+Lessons/resources with parentId pointing to a batch or series are restricted to active enrollees, except explicitly configured isPreview content. If the backend does not enforce a restriction, do not fake security in the UI; fix and deploy the backend source before relying on it.
 
-Provide All Batches, My Batches and a batch detail screen. If access_code exists, ask the student for it and POST /enrollments with accessCode. If no code is set, one tap enrolls. Never return the access code to students. Show wrong-code errors and do not create an enrollment until the backend accepts it. Hide content attached to a batch/series until the student is enrolled.
+### Lectures, playlist import and player
 
-### Lectures and player
+Admin flow for one video:
+- Choose exam (JEE/NEET/Both), class(es), target batch or series, topic/lesson and order.
+- Enter a YouTube URL; call Cloudflare /video?url=... and auto-fill title/thumbnail when available.
+- Keep title, thumbnail and description editable.
+- Allow notes/PDF URL and active/preview flag.
+- Save kind=lecture to course_catalog with its UUID, and metadata fields youtubeUrl, videoId, thumbnailUrl, duration, position, parentId, lesson/topic and optional notesPdfUrl, isPreview and playlistId.
 
-Admin can add one video URL or import a public playlist. For one URL, call Cloudflare /video?url=..., auto-fill title and thumbnail if returned, and keep both editable. Let the admin choose the parent batch/series, lesson/topic, ordering, exam/class and notes/PDF link.
+Admin playlist flow:
+- Paste a public YouTube playlist URL and fetch metadata from Cloudflare /playlist.
+- Follow every returned nextCursor until complete or cancelled. Deduplicate by videoId. Show imported/failed counts.
+- Let the admin select all or a subset, reorder entries, edit title and thumbnail, set one target batch/series and lesson topic, select exam/classes, then confirm the save.
+- Never silently lose items on pagination failure. Preserve failed items' URLs and offer manual add.
+- Verify worker response shape against actual deployed source before coding assumptions.
 
-For a playlist:
-- Call Cloudflare /playlist?url=....
-- Follow pagination cursors until complete or the admin cancels; show progress/count and deduplicate by videoId.
-- Preview imported rows and allow editing title, thumbnail, lesson/topic and ordering.
-- Do not save until the admin confirms target batch/series, exam and class.
-- If import fails, retain the original URL and offer manual link entry.
+Student lecture click should open a dedicated player screen/page with responsive YouTube embed, controls, fullscreen, title, batch/topic context, previous/next and a scrollable following-lesson list. Use YouTube embed, not a local video element for a YouTube URL. A user click should trigger playback attempt; browsers may block autoplay, so show a prominent Play button on failure. Persist progress periodically through POST /progress using lectureId (the course_catalog UUID), watchedSeconds and completed. Avoid a database write on every second; debounce/batch updates and flush on exit where possible. Do not fake watched time or completion.
 
-A lecture click opens a dedicated player screen: large responsive YouTube iframe, fullscreen, title, batch/lesson context, next/previous actions and scrollable upcoming lesson list. Build the embed URL from videoId; keep controls and fullscreen enabled. Do not scrape, download or rehost video bytes. Persist watch progress periodically to POST /progress with lectureId (the course_catalog UUID), watchedSeconds and completed; avoid writing every second. Resume where possible. Show related PDFs/notes.
+### Series and PDFs/resources
 
-Lecture metadata should contain youtubeUrl, videoId, thumbnailUrl, duration, position, parentId (parent batch/series UUID), lesson/topic name, optional notesPdfUrl, isPreview and playlistId. Use UUIDs consistently, never titles as identifiers.
+Provide All Series, My Series and Series Detail. Series metadata includes features, thumbnail, exam/classes, about and optional access-code. Lessons in a series must use the series UUID as metadata.parentId.
 
-### Series
+Resource items use kind=resource and metadata such as pdfUrl, thumbnailUrl, subject, parentId and order. Offer in-app preview or safe external/browser view with download when possible. Check URL protocol (only http/https), handle inaccessible PDFs and do not execute arbitrary HTML/script content supplied through a URL. Batch-restricted PDFs require enrolment unless explicitly marked preview.
 
-Provide All Series, My Series and Series Details. Admin can create series with title, about, thumbnail URL, exam, classes, optional access code and features. Series can contain ordered lessons. Enroll by code when configured, or one tap when no code exists. Store child parentId as the series UUID.
+### Tests, timed scheduling and JSON question bank
 
-### Tests and JSON question bank
+Separate live, upcoming, expired and completed tests. Each card displays title, exam/class, subject, start/end time, duration, question count and marks where configured.
 
-Separate upcoming, live and completed tests. Show start/end time, duration, number of questions and marks. Admin can create a test with title, description, subject, exam, one/both classes, scheduledAt, endsAt, durationMinutes, marksPerQuestion, negativeMarks, isLive, allowMultipleAttempts and ordered questions.
+Admin can create/edit a test with:
+- title, description and subject;
+- exam JEE/NEET/Both and classes 11/12/both;
+- active switch;
+- scheduledAt, endsAt, durationMinutes, isLive;
+- marksPerQuestion, negativeMarks, allowMultipleAttempts;
+- questions JSON with stable IDs, text, optional image/subject/topic, type (start with single-choice), options, correctAnswer, marks/negativeMarks and explanation.
 
-Support paste/upload of JSON with validation before save. Each question should have a stable id, question text, optional image/subject/topic, type (initially single-choice), options, correctAnswer, optional marks/negativeMarks and explanation. Preserve MathJax/LaTeX. Validate all question text, options and correct answers. Preview parsed JSON and show row-specific validation errors.
-
-Example metadata shape:
-
+Support paste or upload of JSON, schema validation, preview and clear row-specific errors before save. Preserve LaTeX/math strings. Require question text, options and a valid answer. Save tests as kind=test in metadata.questions. Example item shape:
     {
-      "subject": "Physics",
-      "durationMinutes": 60,
-      "scheduledAt": "2026-10-18T13:30:00.000Z",
-      "endsAt": "2026-10-18T14:30:00.000Z",
-      "isLive": false,
-      "allowMultipleAttempts": false,
-      "marksPerQuestion": 4,
+      "id": "q1",
+      "type": "single-choice",
+      "text": "Question statement or LaTeX",
+      "options": [
+        {"id": "A", "text": "Option A"},
+        {"id": "B", "text": "Option B"},
+        {"id": "C", "text": "Option C"},
+        {"id": "D", "text": "Option D"}
+      ],
+      "correctAnswer": "B",
+      "marks": 4,
       "negativeMarks": 1,
-      "questions": [
-        {
-          "id": "q1",
-          "type": "single-choice",
-          "text": "Question statement",
-          "options": [
-            { "id": "A", "text": "Option A" },
-            { "id": "B", "text": "Option B" },
-            { "id": "C", "text": "Option C" },
-            { "id": "D", "text": "Option D" }
-          ],
-          "correctAnswer": "B",
-          "explanation": "Shown after submission"
-        }
-      ]
+      "explanation": "Shown after submission"
     }
 
-Never calculate official scores solely in the client. GET /tests/:id returns sanitized questions; POST /tests/:id/submit scores on the backend. Correct answers and explanations must not appear before submission, including GET /content and bootstrap responses. Show countdown, autosave in-progress answers locally, confirm final submit, handle expired test/duplicate-attempt responses and show score, accuracy, correct/incorrect/unanswered counts, explanation review and leaderboard link.
+Never calculate official score solely in the browser. GET /tests and GET /tests/:id must not expose answer keys or explanations before submission. POST /tests/:id/submit sends the selected answers and backend calculates/stores score. Add countdown, in-progress draft answer persistence, question navigation, answered/unanswered/marked status, warning before submit, handling for expired tests and duplicate attempts. After submission show result, accuracy, correct/incorrect/unanswered counts, explanation review and leaderboard link. Treat server response as authoritative.
 
-### Leaderboard
+### Leaderboard and analysis/profile
 
-Provide separate leaderboards for each test and a test selector. Call /leaderboard?testId=<test UUID>. Show rank, display name/avatar and score/max score; never expose email or private profile fields. If no test is selected, show the selector rather than a misleading mixed ranking. No fake rank data.
+Leaderboard must be per test, not a mix of scores across different tests. Use GET /leaderboard?testId=<uuid>. Display rank, display name/avatar, score/max score. Never expose student email or unnecessary private fields. If no test is selected, ask the student to select one instead of inventing a global score. Provide real empty/error/loading states.
 
-### Analysis/Profile
+Use GET /analysis to display learning level, tests taken, average percentage, recent attempts, watched time and completed lessons. Describe level as an educational progress indicator based on saved activity, not an official JEE/NEET rank. Profile displays name/avatar, exam/class, progress and logout. Never calculate progress from static demo data.
 
-Call GET /analysis. Show learning level, completed lessons, watched time, tests taken, average percentage, recent results and lesson progress. Describe level as a learning indicator based on saved data, not an official exam rank. Include profile, exam/class and logout.
+### Events, banners, announcements, chat and notifications
 
-### PDFs/resources
+Admin events/banners support multiple image URLs, titles, descriptions, active/disabled state, start/end schedule, order and validated in-app deep links. Store as kind=event with metadata.images array and schedule fields. Support JEE/NEET/Both and classes selection as in all content editors.
 
-Resource metadata should use pdfUrl, title, description, thumbnail and optional parentId. Open PDF inside the app or in a safe browser/download according to platform. If attached to a restricted batch, require enrollment. Validate URL protocol and never execute arbitrary HTML/scripts from admin-entered URLs.
+Use /admin/announcements for text announcements (title, body, audience, schedule, active). Audience can be All, JEE, NEET, or a matching exam/class target. Respect scheduledAt and active. Bootstrap should show only announcements for the current student and current schedule.
 
-### Events, banners and announcements
+Chat is real-time through Firestore. Student sees own chat thread; admin sees a student conversation list and can reply. In-app notifications can be created/read in Firestore and link to safe internal app routes. Add a badge for unread chat/notifications. If browser push permissions or VAPID key are unavailable, do not block in-app notifications and do not show false “push enabled” status.
 
-Admin can configure multiple event/banner image URLs, title, text, start/end schedule, enabled/disabled and optional internal deep link. Store as kind=event with metadata.images array and schedule fields. Each banner can open its valid internal destination. Validate links and handle missing destinations.
+## 6. Protected admin dashboard at /admin
 
-Use announcements table/API for text notices; bootstrap returns active/scheduled announcements filtered for exam/class. In-app messages/notifications live in Firestore. Mark notifications read and navigate deep links only to valid in-app destinations.
+Check auth on every app load and refresh, but treat client checks only as UX. The server-side Edge Function remains the authority for relational admin operations. A signed-in non-admin must see an access-denied state and must not receive admin API data. Do not create any self-register-as-admin flow.
 
-## 5. Admin panel
+Admin sections/tabs:
+- Dashboard/overview
+- Today's Goals
+- Batches
+- Lectures and playlist import
+- Series
+- Tests and JSON question editor
+- Events/Banners
+- Announcements
+- Students
+- Chat and notifications
 
-The /admin route requires Firebase authentication and server-side authorization. If signed out, show admin sign-in. If signed in with the wrong email, show “Admin access denied.” Do not show the dashboard. The API is the final authority; hiding buttons is not security. No public admin registration.
+Use a desktop sidebar and responsive mobile navigation. All sections must actually persist via APIs/Firestore. Provide create/edit/archive controls, search/filter, active/disabled status, confirmation dialogs, loading and error states. Admin editors for content require exam, class(es), title, description, active flag and metadata-specific fields.
 
-Admin tabs: Dashboard, Today's Goals, Batches, Lectures, Series, Tests & Schedules, Events/Banners, Announcements, Students, Chat/Notifications. Use confirmation dialogs for disabling, save/loading states, validation and feedback.
+API expectations:
+- Create relational content: POST /admin/content.
+- List relational content: GET /admin/content?kind=...&exam=...&class=...
+- Update: PATCH /admin/content/:uuid with the FULL current form state because the function maps/replaces normalized fields.
+- Archive/disable: DELETE /admin/content/:uuid; this is a soft-disable (active=false), not a physical database delete.
+- Overview: GET /admin/overview.
+- Students: GET /admin/students.
+- Announcements: GET/POST /admin/announcements and PATCH /admin/announcements/:uuid.
 
-Global content editor fields: exam JEE/NEET/Both; class 11th/12th/both; title, description; thumbnail/metadata fields; active/disabled state; optional schedule; create/update/archive controls.
+Today's Goals editor should allow exact student-facing text, scheduled start/end, exam, classes, CTA/deep link, active/disabled, priority and a live preview.
 
-Admin flows:
-1. Today's Goals: add multiple goals, schedule time/end, target exam/classes, exact display text, enable/disable and preview.
-2. Add Batch: title, code display, about, instructor/features, thumbnail URL, optional access code, exam/classes and active state. Save kind=batch.
-3. Add Lecture: pick target batch/series, then one YouTube URL or playlist URL, get metadata via Cloudflare, edit title/thumbnail/lesson and confirm save. Playlist import must support all pages/subset/order and attach to the selected parent.
-4. Add Series: title, about, thumbnail, optional code, exam/classes/features and active state, with ordered children.
-5. Add Test: title, exam/classes, schedule, duration/marks, JSON input, validation/preview and save kind=test. Keep answer keys private until result.
-6. Events/Banners: multiple image URL rows, reorder, active toggle, schedule, title/text, deep link and image crop/ratio preview.
-7. Announcements: title/body, All or specific audience, schedule and active state.
-8. Students: search/filter by name, exam/class; show activity/results without secrets.
-9. Chat: admin can open/respond to each student's Firestore thread with sender identity/read state. In-app notification works even if push credentials are not yet configured.
+Add Batch form: title, description/about, thumbnail URL, code display, optional access code, instructor/features, exam, classes and active state. Do not confuse an informational course code with the server-enforced access_code.
 
-All changes must persist across reloads. Do not store production content only in localStorage. Local storage may hold harmless UI preferences or transient test answers; Supabase/Firestore remain source of truth.
+Add Lecture form: target batch/series, one YouTube URL or a playlist URL, editable metadata, lesson/topic, sort order, notes/PDF, exam/classes and active/preview state.
 
-Admin content create: POST /admin/content. Update: PATCH /admin/content/:id with the full current form values, not a partial title-only body. Disable/archive: DELETE /admin/content/:id (soft-disables active=false). Do not physically delete course rows. Announcements use /admin/announcements and /admin/announcements/:id.
+Add Test form: JSON paste/upload, parsing/validation, preview and settings for schedule, duration, marks, negative marking and attempts. Keep keys private until backend result.
 
-## 6. API contract
+Students page: filter/search by name, exam/class and show progress or test records only as provided by authorized API. Never display service secrets or include sensitive values in client logs.
 
-Base URL: https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
+## 7. Exact backend API contract
 
-Headers: Authorization: Bearer <Firebase ID token>, apikey: <Supabase publishable key>, Content-Type: application/json.
+Base URL:
+https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
 
-- GET /health — public check.
-- GET /profile
+Required request headers:
+Authorization: Bearer <current Firebase ID token>
+apikey: <Supabase publishable key from environment>
+Content-Type: application/json for JSON payloads
+
+Routes implemented by the current function:
+- GET /health — public health response; no Firebase token required.
+- GET /profile — current signed-in user's profile.
 - POST /profile — { displayName, exam, classLevel }.
-- GET /bootstrap
-- GET /content?kind=batch|series|lecture|resource|event|goal|test&exam=JEE|NEET&class=11|12&parentId=<uuid>
+- PATCH /profile — update onboarding/profile through the implemented request shape.
+- GET /bootstrap — profile, active content and announcements.
+- GET /content?kind=batch|series|lecture|resource|event|goal|test&exam=JEE|NEET&class=11|12&parentId=<uuid>.
 - POST /enrollments — { itemType: "batch"|"series", itemId: "<uuid>", accessCode?: "..." }.
 - POST /progress — { lectureId: "<course_catalog UUID>", watchedSeconds: number, completed: boolean }.
-- GET /tests
-- GET /tests/:uuid
+- GET /tests — list personalised tests.
+- GET /tests/:uuid — sanitised questions for an eligible active test.
 - POST /tests/:uuid/submit — { answers: { questionId: selectedOptionId } }.
-- GET /tests/:uuid/result
-- GET /leaderboard?testId=<uuid>
-- GET /analysis
-- GET /admin/overview
-- GET /admin/students
+- GET /tests/:uuid/result — current student's latest saved result for that test.
+- GET /leaderboard?testId=<uuid>.
+- GET /analysis.
+- GET /admin/overview.
+- GET /admin/students.
 - GET /admin/content?kind=...&exam=...&class=...
-- POST /admin/content
-- PATCH /admin/content/:uuid
-- DELETE /admin/content/:uuid (soft-disable)
-- GET /admin/announcements
-- POST /admin/announcements
-- PATCH /admin/announcements/:uuid
+- POST /admin/content.
+- PATCH /admin/content/:uuid.
+- DELETE /admin/content/:uuid — soft-disable.
+- GET /admin/announcements.
+- POST /admin/announcements.
+- PATCH /admin/announcements/:uuid.
 
-Content payloads use kind, title, description, exam, classes, active, accessCode and metadata. Keep metadata field names consistent and preserve unknown existing properties when editing. Never put answer keys into client caches, analytics, logs or general content responses.
+Do not assume an endpoint exists just because it would be convenient. Inspect the source and implement/deploy a matching backward-compatible endpoint if genuinely needed. Keep Edge Function source under supabase/functions/exam-cracker-api/index.ts synced with the deployed slug exam-cracker-api. Test health and authenticated flows where access permits; never disable token checking to make a frontend request work.
 
-## 7. Firebase Console tasks — state truthfully
+## 8. Environment variables
 
-Confirm Email/Password and Google providers are enabled. Confirm Firestore exists and deploy firestore.rules. Add Android package com.darvo.ec and fingerprints if needed. Add authorised web domains for web Google sign-in. Set a real FCM Web VAPID key from Firebase Console if web push is enabled. Set trusted Firebase Admin credentials securely if push delivery requires server-side sends. Never commit those credentials.
+Update .env.example for Next.js names, and have README explain copying it to .env.local.
 
-Do not claim these manual actions are complete unless checked. Public Firebase config and the Supabase publishable key may be in .env.example; private keys and server/service-role credentials may not. Document any pending setup in README.
+Public browser configuration:
+- NEXT_PUBLIC_FIREBASE_API_KEY = AIzaSyDuvN6q4ybHc6rLTHlYdhSs5_rzvc8nhTA
+- NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = darvo1.firebaseapp.com
+- NEXT_PUBLIC_FIREBASE_PROJECT_ID = darvo1
+- NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = darvo1.firebasestorage.app
+- NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = 283467136948
+- NEXT_PUBLIC_FIREBASE_APP_ID = 1:283467136948:web:c66fd594827909eb3f7ce1
+- NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID = G-FMV79YMHBC
+- NEXT_PUBLIC_SUPABASE_URL = https://kncbvcozpcrfvxdbkbtf.supabase.co
+- NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = sb_publishable_-4si2gp96FDx7ziHHMO7Kg_sasmLYB2
+- NEXT_PUBLIC_SUPABASE_FUNCTION_URL = https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
+- NEXT_PUBLIC_CLOUDFLARE_MEDIA_PROXY_URL = https://ec-content-api.arvinddara0290.workers.dev
+- NEXT_PUBLIC_ADMIN_EMAIL = arvinddarabishnoi@gmail.com
+- NEXT_PUBLIC_FIREBASE_VAPID_KEY = optional empty value until a real public VAPID key is obtained from Firebase Console.
 
-## 8. Acceptance checklist
+All NEXT_PUBLIC values ship to the browser. No Supabase secret/service_role key, Firebase Admin service account or Cloudflare API token belongs here. Add and maintain .gitignore to protect .env.local and all private key formats.
 
-Before finishing:
-- Install dependencies with a lockfile; run type-check, lint if configured, production build and fix failures.
-- Verify login/logout, session restoration, onboarding save and admin route protection.
-- Verify JEE/NEET and class filtering on every page/editor.
-- Verify create/edit/disable batch, series, lecture, test, goal, resource, event/banner and announcement.
-- Verify open enrollment, valid-code enrollment and rejected wrong-code behavior.
-- Verify playlist cursor pagination/deduplication, manual video fallback, editable metadata and lecture playback.
-- Verify student content responses do not expose answer keys; server calculates/stores test scores.
-- Verify per-test leaderboard, analysis from real records and chat Firestore rules.
-- Verify empty/error states. Do not substitute dummy data.
-- Verify Android package com.darvo.ec, production build and debug APK build in GitHub Actions; upload app-debug.apk as an artifact.
-- Update README with commands, exact env variables, deployed URLs, Firebase Console status and remaining genuine blockers.
+## 9. Real-world integration and manual console tasks
 
-Finish by summarising files changed, checks actually run, APK workflow location and any remaining manual Firebase task. Do not claim a check succeeded unless it was actually run.
+Do not claim completion without verifying it. The coding agent may lack Firebase/Cloudflare dashboard access, so list these exactly when not verifiable:
+- Firebase Console: ensure Email/Password and Google providers are enabled.
+- Ensure the admin Firebase Auth user arvinddarabishnoi@gmail.com already exists.
+- Ensure Firestore database exists and deploy/check firestore.rules from this repo.
+- Add the hosting domain to Firebase Authentication authorised domains when Google sign-in requires it.
+- Create/configure a real Web Push VAPID key only if using browser push.
+- For Cloudflare website deploy through GitHub Actions, add CLOUDFLARE_API_TOKEN as a repository Actions secret and CLOUDFLARE_ACCOUNT_ID as a repository secret/variable. Token needs the appropriate Workers deployment permission.
+- If direct Firebase push delivery needs Firebase Admin credentials, store them only in secure backend/CI secrets and document the exact manual configuration; never commit the credential JSON.
+
+Use Cloudflare's official deployment docs: https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/ and review vinext's current compatibility status because it is beta. Use the official Firebase web Auth and FCM docs as needed. Do not rely on old blog posts for config details.
+
+## 10. Accessibility, performance and quality
+
+- Use semantic forms, proper labels, keyboard navigation, visible focus, sufficient contrast and mobile safe-area padding.
+- Use accessible dialogs/drawers, reduced-motion support, lazy-load thumbnails and paginate content lists when needed.
+- Do not render user-provided URLs as executable HTML. Validate allowed schemes and only render safe internal deep links to known app routes.
+- Keep server credentials out of logs and UI. Avoid logging tokens, email lists, answer keys or access codes.
+- Show a helpful empty state when no content exists, such as “No lectures yet. The admin can add lectures from Dashboard → Lectures.” Do not fabricate sample courses.
+- Unit-test API client error handling, profile filters, question JSON validation and scoring-result rendering where applicable.
+- Use current security-patched dependency versions, commit lockfile and run npm audit; resolve critical/high findings or explain verified unavoidable exceptions.
+- Run npm ci, type-check, lint, tests and production build in CI. If the coding agent cannot execute a command locally, make GitHub Actions run it and read the real workflow result before saying it passed.
+- Keep a log of what is actually implemented and what requires manual credentials/configuration.
+
+## 11. Definition of done
+
+The work is not done until:
+1. Next.js routes render and the app builds without errors.
+2. Email/password and Google authentication flows are connected to Firebase, with correct loading/error/session handling.
+3. Onboarding saves name/exam/class to Supabase through the verified Firebase-token API.
+4. Home shows real scheduled goals, event banners, tests, announcements and user content.
+5. Admin can create/edit/disable batches, series, lectures, resources, tests, goals, events and announcements and can import playlist metadata without a YouTube Data API key.
+6. Student can browse/enrol, open a YouTube player, resume progress, take a timed test, see a server-calculated result, choose a test-specific leaderboard and see analysis.
+7. Firestore chat and in-app notification listeners work with restrictive rules, and non-admin users cannot access other students' chats/admin functions.
+8. No secret is committed and the public browser config only contains approved client values.
+9. Cloudflare web app uses a separate Worker/config from ec-content-api. GitHub Actions checks build successfully. Deployment is only called complete when a real deployment has succeeded.
+10. README contains install/run/build/deploy commands, API URLs, env keys, Firebase manual requirements, and truthful status of anything incomplete.
+
+At the end, report: pages/features implemented; files changed; current build/test/Actions results with evidence; deployment URL if truly deployed; and every remaining manual Console/secrets step. Do not report a successful APK build for this web-app task.
