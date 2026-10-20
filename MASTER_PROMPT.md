@@ -22,21 +22,44 @@ You are the implementation agent for **Exam Cracker (EC)**. Build a real, produc
 
 ## 2. Before implementation: inspect and document actual repository state
 
-The current repo contains service configuration/source, not the finished student UI. Inspect the existing files, particularly:
-- google-services.json
-- .env.example
-- README.md
-- MASTER_PROMPT.md
-- workers/ec-content-api/src/index.js
-- wrangler.toml
-- supabase/functions/exam-cracker-api/index.ts
-- supabase/migrations/20261017000000_ec_query_indexes.sql
-- firestore.rules and firebase.json
-- .github/workflows/android-apk.yml
+The current repository already contains a substantial Vite + React student/admin SPA and a Capacitor Android scaffold, in addition to the connected backend sources. This is a MIGRATION task, not a blank-slate rebuild. Audit and preserve its working features and logic before changing the framework. Inspect at minimum:
+- google-services.json and android/app/google-services.json
+- .env.example, README.md and MASTER_PROMPT.md
+- package.json, package-lock.json, index.html, vite.config.ts, tailwind.config.js, postcss.config.js and tsconfig files
+- src/main.tsx, src/app/App.tsx, src/app/AppContext.tsx, src/index.css and src/types/index.ts
+- src/lib/api.ts, config.ts, firebase.ts, firestore.ts, mediaProxy.ts, date.ts and validation.ts
+- existing tests under src/__tests__/
+- all screens under src/features/auth, home, admin, batches, lectures, series, tests, leaderboard, profile, chat and notifications
+- workers/ec-content-api/src/index.js and root wrangler.toml
+- supabase/functions/exam-cracker-api/index.ts and supabase/migrations/20261017000000_ec_query_indexes.sql
+- firestore.rules, firebase.json and .github/workflows/android-apk.yml
 
-Do not overwrite or delete the existing service code without understanding it. The root wrangler.toml currently targets the existing media proxy Worker, ec-content-api. It must NOT be used to deploy the Next.js website. Move its configuration to workers/ec-content-api/wrangler.toml, adjust the config's main path to src/index.js, and verify the deployment still targets ec-content-api. Create a separate root configuration for the Next.js website. Update README commands to use the correct config for each deployment. The already-deployed media Worker URL must not change.
+First understand the current data types, API behavior, authentication/session handling, scheduling logic, playlist pagination, test scoring UI and admin CRUD flows. Reuse/refactor existing components and service clients where practical. Preserve feature parity and existing tests; do not casually delete working code or replace fully built pages with placeholder screens. The current app is not yet Next.js just because this prompt exists; verify every migration step with real type/build/test results.
 
-This repo was initially prepared for an Android/Capacitor build. This request now targets a Next.js web app. Remove or replace the obsolete Android APK workflow so it cannot fail on normal web-app commits. Preserve google-services.json for the user's future Android package, but do not treat it as the web Firebase config or a Firebase Admin key. Do not add Capacitor unless explicitly requested later.
+The root wrangler.toml currently targets the existing media proxy Worker, ec-content-api. It must NOT be used to deploy the Next.js website. Move its configuration to workers/ec-content-api/wrangler.toml, adjust main to src/index.js relative to that config, and confirm its worker name stays ec-content-api. Create a separate root Next.js/Cloudflare Worker config for the website. The existing media Worker URL must not change.
+
+This repository also contains an Android/Capacitor scaffold and an APK workflow. The current deliverable is the Next.js web app. Keep the native Android source/configuration intact for future use, but remove or replace the old APK workflow if it becomes incompatible with a Next.js Worker build; do not leave a workflow that fails on every web commit. Do not claim APK support works with server-rendered Next.js unless a real build proves it. Preserve google-services.json, but do not treat it as the web Firebase config or a Firebase Admin key.
+
+Migration-specific requirements:
+- Convert the existing Vite/React Router app into the Next.js App Router. Map existing screens to real Next.js routes and migrate navigation from react-router-dom to next/navigation. Do not simply put the old SPA inside one root page and call the work done.
+- Reuse and adapt existing feature components: AuthPage, OnboardingPage, HomePage, LecturesHubPage, LecturePlayerPage, BatchDetailPage, SeriesDetailPage, TestsPage, TestAttemptPage, LeaderboardPage, ProfileAnalysisPage, StudentChatPage, NotificationsDrawer and the admin tabs. Keep their behavior and visual consistency.
+- Refactor src/lib/config.ts to use the NEXT_PUBLIC_* environment variables listed in this prompt rather than import.meta.env/VITE_*. Avoid hardcoding runtime defaults in source except clearly safe fallback behavior; validate missing config at startup and show a useful setup message.
+- Firebase Auth, Firestore and Messaging browser code must remain client-only. Add Next.js client boundaries and prevent window/IndexedDB/Notification APIs from being touched during server rendering.
+- Port, adapt or replace Vite/Vitest setup with a documented Next.js-compatible test setup. Preserve/extend src/__tests__/examCracker.test.ts coverage for date/schedule helpers, safe URLs, playlist paging, API errors, admin email UI gates and test JSON validation.
+- Retire Vite-specific entry points and dependencies only after the Next.js app builds. Replace index.html usage with app/layout.tsx metadata. Do not let old Vite scripts remain the default build commands.
+- Keep app components and service helpers under src where reasonable, using src/app for Next.js routes/layouts. Do not create a second nested project and leave the real repository unused.
+
+### Existing feature migration checklist
+
+Before deleting old files, create a route/component migration checklist from the current source. Ensure these existing flows still work after conversion:
+- Email/password + Google sign-in, password reset, session restore, sign-out and first-run onboarding.
+- Home goals, banner/event carousel, live/upcoming tests, notices and enrolled learning.
+- All/My Batches, access-code enrolment, Series, lecture metadata lookup, complete playlist paging/deduplication/manual fallback, YouTube player, next/previous lessons and PDF viewer.
+- JSON test validation, timer, saved in-progress answers, backend score submission, result/explanation screen, test-specific leaderboard and analysis/profile.
+- Admin dashboard counts, content create/update/disable, question editor, batch/series/lecture workflows, students and real-time chat.
+- Firestore unread indicators, notification listener/read state and safe in-app navigation.
+Any regression must be fixed before reporting the migration complete.
+
 
 ## 3. Next.js and Cloudflare hosting
 
