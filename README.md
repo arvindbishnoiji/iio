@@ -1,44 +1,46 @@
-# Exam Cracker — Next.js web app hand-off
+# Exam Cracker — Next.js migration and services
 
-Exam Cracker is a JEE/NEET learning app. Start with MASTER_PROMPT.md: it describes the complete Next.js application, Firebase flows, existing Supabase API and Cloudflare integration.
+This repository currently contains an existing Vite + React student/admin app, a Capacitor Android scaffold, and connected backend source. The current task is to migrate the existing UI to Next.js App Router while preserving working features. Follow MASTER_PROMPT.md as the implementation specification; do not assume that migration is complete until CI verifies it.
 
-## Existing connected services
+## Existing application
+
+The current UI and service helpers are under src/features and src/lib. Inspect these files before changing architecture. Reuse and migrate the working auth, onboarding, admin, home, batches, lectures, tests, leaderboard, profile, chat, notifications, API, date/scheduling, validation and playlist-import logic. MASTER_PROMPT.md includes the route migration and feature-parity checklist.
+
+## Services and connection values
 
 ### Firebase
 - Project ID: darvo1
-- Android app package already configured in google-services.json: com.darvo.ec
-- This task builds a Next.js web app, so use the web app values in .env.example; google-services.json is Android client configuration only.
-- Email/Password, Google provider, Firestore and web push prerequisites must be verified in Firebase Console before production. Do not use google-services.json as a Firebase Admin credential.
+- Android package: com.darvo.ec
+- .env.example contains the Next.js web Firebase configuration as NEXT_PUBLIC_* variables.
+- Verify Email/Password and Google providers, admin account, Firestore and authorised domains in Firebase Console. google-services.json is Android client configuration, not a web config or Firebase Admin service-account credential.
 
 ### Supabase
 - Project ref: kncbvcozpcrfvxdbkbtf
 - Project URL: https://kncbvcozpcrfvxdbkbtf.supabase.co
-- Firebase-token-verifying Edge Function: https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
+- Deployed Firebase-token-verifying Edge Function: https://kncbvcozpcrfvxdbkbtf.supabase.co/functions/v1/exam-cracker-api
 - Source: supabase/functions/exam-cracker-api/index.ts
 - Tables: student_profiles, course_catalog, lesson_progress, exam_attempts, enrollments, announcements.
-- RLS is enabled and direct client access is intentionally denied. Use the deployed Edge Function; never put a server key in the browser.
+- RLS deliberately denies direct browser table access. Use the Edge Function with a current Firebase ID token and the Supabase publishable key. Do not add allow-all policies or expose server-side keys.
 
-### Cloudflare media Worker
+### Cloudflare YouTube metadata Worker
 - Name: ec-content-api
 - URL: https://ec-content-api.arvinddara0290.workers.dev
 - Source: workers/ec-content-api/src/index.js
-- Worker config should live in workers/ec-content-api/wrangler.toml so the root config can belong to the Next.js website.
+- Move its Wrangler config to workers/ec-content-api/wrangler.toml so the root config can target the Next.js website. Keep the deployed Worker name and URL unchanged.
 - Endpoints: /health, /video?url=..., /playlist?url=...&limit=200&cursor=...
-- It uses public YouTube metadata without a YouTube Data API key. Public playlist metadata may fail if YouTube changes its page format; always provide manual URL entry as a fallback.
+- Public playlist metadata does not require a YouTube Data API key. YouTube formats can change; keep a manual video-link fallback.
 
-## Web app setup
+## Local development and deployment
 
 1. Copy .env.example to .env.local.
-2. Install Node dependencies using the package manager and lockfile created by the app implementation.
-3. Use the current Cloudflare Next.js deployment guide and compatibility-check the recommended adapter before deploying. The current Cloudflare guide recommends vinext for new Next.js projects on Workers, but it is beta; if the actual requirements are not covered, use the documented OpenNext adapter and verify through CI.
-4. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to GitHub Actions secrets/variables for automated deployment. Never commit the API token.
-5. Verify Firebase Auth providers, admin account, Firestore rules/domain and optional VAPID configuration in Firebase Console.
+2. Use the package manager and lockfile after completing the Next.js migration.
+3. Follow the current official Cloudflare Next.js guide and compatibility-check the deployment adapter. The current guide recommends vinext for new Next.js projects on Workers, but it is beta; use a documented supported adapter and verify it through CI.
+4. Configure CLOUDFLARE_API_TOKEN as a GitHub Actions secret and CLOUDFLARE_ACCOUNT_ID as a repository secret/variable for automated website deployment.
+5. Ensure the website Worker uses a separate name and config from ec-content-api.
 
-## Important security notes
+## Security and status
 
-- Firebase signs in students and admins. The Supabase Edge Function verifies Firebase ID tokens and enforces admin/content access server-side.
-- The Supabase publishable key and Firebase web config are client-public values; they are not a replacement for authentication/authorization.
-- Do not expose a Supabase secret/service-role key, Firebase Admin private key or Cloudflare API token in source control or NEXT_PUBLIC_ variables.
-- In-app Firestore chat/notifications should work without Web Push. Actual browser push requires an HTTPS origin and a real Firebase Web Push VAPID key; server-sent push may need secure backend Admin credentials.
-
-Do not claim that the complete application is built or deployed until GitHub Actions and the real deployment confirm it.
+- NEXT_PUBLIC_* configuration is intentionally public. Never add a Supabase secret/service-role key, Firebase Admin private key or Cloudflare API token to source control or browser variables.
+- Firestore chat/in-app notifications require restrictive rules. Web push needs HTTPS and a real VAPID key from Firebase Console; in-app notification listeners should still work without it.
+- Keep the Android source/configuration, but do not claim the APK workflow remains compatible with a server-rendered Next.js app unless an actual build confirms it.
+- Report only build, test and deployment results actually confirmed by GitHub Actions or the relevant service.
